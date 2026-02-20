@@ -1,0 +1,232 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, CheckCircle2, ChevronRight, Save, Trophy, Users } from 'lucide-react';
+import { organizations, halls, criteria, getTeamsByOrg, teams, reviewers } from '@/data/mockData';
+import type { ScoreEntry } from '@/data/mockData';
+import { useScores } from '@/context/ScoresContext';
+import { toast } from 'sonner';
+
+type Step = 'setup' | 'select-org' | 'select-team' | 'verify-members' | 'scoring';
+
+const ReviewerPage = () => {
+  const navigate = useNavigate();
+  const { addScore } = useScores();
+
+  const [step, setStep] = useState<Step>('select-org');
+  const [reviewerName, setReviewerName] = useState(() => localStorage.getItem('reviewerName') || '');
+  const [selectedHall, setSelectedHall] = useState(() => localStorage.getItem('reviewerHallId') || '');
+  const [selectedOrg, setSelectedOrg] = useState('');
+  const [selectedTeam, setSelectedTeam] = useState('');
+  const [membersVerified, setMembersVerified] = useState(false);
+  const [scores, setScoresLocal] = useState<Record<string, number>>({});
+
+  const team = teams.find((t) => t.id === selectedTeam);
+  const orgTeams = selectedOrg ? getTeamsByOrg(selectedOrg) : [];
+
+  const handleOrgSelect = (orgId: string) => {
+    setSelectedOrg(orgId);
+    setSelectedTeam('');
+    setMembersVerified(false);
+    setScoresLocal({});
+    setStep('select-team');
+  };
+
+  const handleTeamSelect = (teamId: string) => {
+    setSelectedTeam(teamId);
+    setMembersVerified(false);
+    setScoresLocal({});
+    setStep('verify-members');
+  };
+
+  const handleVerify = () => {
+    setMembersVerified(true);
+    setStep('scoring');
+  };
+
+  const handleScoreChange = (criteriaId: string, value: string, maxMarks: number) => {
+    const num = parseInt(value);
+    if (value === '') {
+      setScoresLocal((prev) => ({ ...prev, [criteriaId]: 0 }));
+      return;
+    }
+    if (isNaN(num) || num < 0 || num > maxMarks) return;
+    setScoresLocal((prev) => ({ ...prev, [criteriaId]: num }));
+  };
+
+  const totalScore = Object.values(scores).reduce((a, b) => a + b, 0);
+
+  const handleSave = () => {
+    const allFilled = criteria.every((c) => scores[c.id] !== undefined);
+    if (!allFilled) {
+      toast.error('Please enter marks for all criteria');
+      return;
+    }
+    const entry: ScoreEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      hallId: selectedHall,
+      reviewerName: reviewerName.trim(),
+      organizationId: selectedOrg,
+      teamId: selectedTeam,
+      membersVerified: true,
+      scores: { ...scores },
+      totalScore,
+      timestamp: new Date().toISOString(),
+    };
+    addScore(entry);
+    toast.success('Scores saved successfully!');
+    // Reset for next team
+    setSelectedOrg('');
+    setSelectedTeam('');
+    setMembersVerified(false);
+    setScoresLocal({});
+    setStep('select-org');
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="gradient-navy px-6 py-4 flex items-center gap-4">
+        <button onClick={() => navigate('/')} className="text-primary-foreground hover:text-gold transition-colors">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div className="flex items-center gap-3">
+          <Trophy className="w-5 h-5 text-gold" />
+          <h1 className="text-lg font-bold text-primary-foreground">Reviewer Panel</h1>
+        </div>
+        {reviewerName && (
+          <span className="ml-auto text-sm text-primary-foreground/70">
+            {reviewerName} • {halls.find((h) => h.id === selectedHall)?.name}
+          </span>
+        )}
+      </header>
+
+      <main className="max-w-2xl mx-auto p-6">
+        {/* Step: Select Organization */}
+        {step === 'select-org' && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-foreground">Select Organization</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {organizations.map((org) => (
+                <button
+                  key={org.id}
+                  onClick={() => handleOrgSelect(org.id)}
+                  className="group rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-card-foreground hover:border-gold hover:shadow-gold transition-all flex items-center justify-between"
+                >
+                  {org.name}
+                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-gold transition-colors" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Step: Select Team */}
+        {step === 'select-team' && (
+          <div className="space-y-4">
+            <button onClick={() => setStep('select-org')} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="w-4 h-4" /> Back to organizations
+            </button>
+            <h2 className="text-2xl font-bold text-foreground">
+              Select Team — {organizations.find((o) => o.id === selectedOrg)?.name}
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {orgTeams.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => handleTeamSelect(t.id)}
+                  className="group rounded-xl border border-border bg-card p-4 text-left hover:border-gold hover:shadow-gold transition-all"
+                >
+                  <div className="font-semibold text-card-foreground text-sm">{t.name}</div>
+                  <div className="text-xs text-muted-foreground mt-1 truncate">{t.projectTitle}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Step: Verify Members */}
+        {step === 'verify-members' && team && (
+          <div className="space-y-4">
+            <button onClick={() => setStep('select-team')} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="w-4 h-4" /> Back to teams
+            </button>
+            <h2 className="text-2xl font-bold text-foreground">{team.name}</h2>
+            <p className="text-muted-foreground">{team.projectTitle}</p>
+
+            <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-card-foreground">
+                <Users className="w-4 h-4 text-gold" />
+                Team Members
+              </div>
+              {team.members.map((m) => (
+                <div key={m.id} className="flex items-center gap-3 rounded-lg bg-muted px-4 py-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-success" />
+                  <span className="text-sm text-foreground">{m.name}</span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={handleVerify}
+              className="w-full gradient-gold text-gold-foreground font-bold rounded-xl py-3 shadow-gold hover:opacity-90 transition-opacity"
+            >
+              Members Verified — Proceed to Scoring
+            </button>
+          </div>
+        )}
+
+        {/* Step: Scoring */}
+        {step === 'scoring' && team && (
+          <div className="space-y-4">
+            <button onClick={() => setStep('verify-members')} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="w-4 h-4" /> Back
+            </button>
+            <div>
+              <h2 className="text-2xl font-bold text-foreground">{team.name}</h2>
+              <p className="text-sm text-muted-foreground">{team.projectTitle}</p>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="gradient-navy px-5 py-3 flex items-center justify-between">
+                <span className="text-sm font-semibold text-primary-foreground">Criteria</span>
+                <span className="text-sm font-semibold text-primary-foreground">Score</span>
+              </div>
+              {criteria.map((c) => (
+                <div key={c.id} className="flex items-center justify-between px-5 py-3 border-b border-border last:border-0">
+                  <div>
+                    <span className="font-mono text-xs text-gold font-semibold mr-2">{c.label}</span>
+                    <span className="text-sm text-card-foreground">{c.name}</span>
+                    <span className="text-xs text-muted-foreground ml-2">(max {c.maxMarks})</span>
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    max={c.maxMarks}
+                    value={scores[c.id] ?? ''}
+                    onChange={(e) => handleScoreChange(c.id, e.target.value, c.maxMarks)}
+                    className="w-16 rounded-lg border border-input bg-background px-3 py-1.5 text-center text-sm font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="—"
+                  />
+                </div>
+              ))}
+              <div className="flex items-center justify-between px-5 py-3 bg-muted">
+                <span className="font-bold text-foreground">Total</span>
+                <span className="font-bold text-lg text-gold">{totalScore} / 100</span>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSave}
+              className="w-full gradient-gold text-gold-foreground font-bold rounded-xl py-3 shadow-gold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+            >
+              <Save className="w-5 h-5" />
+              Save Scores
+            </button>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
+export default ReviewerPage;

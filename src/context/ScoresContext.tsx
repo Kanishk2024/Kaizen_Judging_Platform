@@ -79,6 +79,7 @@ interface DataContextType {
   loading: boolean;
   error: string | null;
   addScore: (entry: ScoreEntry) => Promise<void>;
+  deleteScore: (scoreId: string) => Promise<void>;
   fetchData: () => Promise<void>;
   clearAllData: () => void;
   getTeamsByOrg: (orgId: string) => Team[];
@@ -126,7 +127,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const addScore = useCallback(async (entry: ScoreEntry) => {
-    setScores(prev => [...prev, entry]);
+    setScores(prev => {
+      // Check if a non-deleted score already exists for this reviewer + team combination
+      const existingScore = prev.find(
+        s => s.reviewerName === entry.reviewerName && 
+             s.teamId === entry.teamId && 
+             !s.deleted
+      );
+      if (existingScore) {
+        throw new Error('A score already exists for this team. It must be deleted by the organizer before you can re-review.');
+      }
+      return [...prev, { ...entry, deleted: false }];
+    });
+  }, []);
+
+  const deleteScore = useCallback(async (scoreId: string) => {
+    setScores(prev => 
+      prev.map(score => 
+        score.id === scoreId ? { ...score, deleted: true } : score
+      )
+    );
   }, []);
 
   const clearAllData = useCallback(() => {
@@ -163,6 +183,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loading,
       error,
       addScore,
+      deleteScore,
       fetchData,
       clearAllData,
       getTeamsByOrg,

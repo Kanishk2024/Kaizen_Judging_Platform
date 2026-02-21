@@ -201,6 +201,7 @@ export interface ScoreEntry {
   scores: Record<string, number>; // criteriaId -> score
   totalScore: number;
   timestamp: string;
+  deleted?: boolean; // If true, the score has been deleted by organizer and can be re-reviewed
 }
 
 // Helper to get teams by org

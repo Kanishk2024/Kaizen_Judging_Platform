@@ -2,10 +2,11 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Download, Trophy, Shield, Trash2, Edit } from 'lucide-react';
 import { useData } from '@/context/ScoresContext';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 const OrganizerPage = () => {
   const navigate = useNavigate();
-  const { organizations, teams, halls, criteria, scores, loading, error, clearAllData } = useData();
+  const { organizations, teams, halls, criteria, scores, loading, error, clearAllData, deleteScore } = useData();
   const [isAdminMode, setIsAdminMode] = useState(() => {
     return localStorage.getItem('organizerAdminToken') === 'organizer-admin-token';
   });
@@ -21,6 +22,24 @@ const OrganizerPage = () => {
     }
   };
 
+  const handleDeleteScore = async (scoreId: string, reviewerName: string, teamName: string) => {
+    const score = activeScores.find(s => s.id === scoreId);
+    if (!score) return;
+
+    if (confirm(`Are you sure you want to delete the score for "${teamName}" reviewed by "${reviewerName}"?\n\nThis will allow the reviewer to re-review this team.`)) {
+      try {
+        await deleteScore(scoreId);
+        toast.success('Score deleted successfully', {
+          description: `The reviewer "${reviewerName}" can now re-review "${teamName}".`,
+        });
+      } catch (err) {
+        toast.error('Failed to delete score', {
+          description: 'Please try again.',
+        });
+      }
+    }
+  };
+
   const exportCSV = () => {
     const headers = [
       'Hall',
@@ -32,7 +51,9 @@ const OrganizerPage = () => {
       'Timestamp',
     ];
 
-    const rows = scores.map((s) => {
+    // Only export non-deleted scores
+    const activeScores = scores.filter(s => !s.deleted);
+    const rows = activeScores.map((s) => {
       const hall = halls.find((h) => h.id === s.hallId)?.name ?? '';
       const org = organizations.find((o) => o.id === s.organizationId)?.name ?? '';
       const team = teams.find((t) => t.id === s.teamId);
@@ -56,6 +77,9 @@ const OrganizerPage = () => {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // Filter out deleted scores for main display
+  const activeScores = scores.filter(s => !s.deleted);
 
   if (loading) {
     return (
@@ -116,13 +140,28 @@ const OrganizerPage = () => {
       </header>
 
       <main className="p-6">
-        {scores.length === 0 ? (
+        {activeScores.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-muted-foreground text-lg">No scores submitted yet.</p>
+            <p className="text-muted-foreground text-lg">No active scores submitted yet.</p>
             <p className="text-sm text-muted-foreground mt-1">Reviewers need to submit scores first.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
+          <div className="space-y-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-1">
+                    Individual Score Management
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-200">
+                    You can delete individual scores using the "Delete" button in the Actions column. 
+                    Deleting a score allows the reviewer to re-review that team. Only active (non-deleted) scores are shown below.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
             <table className="w-full text-sm">
               <thead>
                 <tr className="gradient-navy text-primary-foreground">
@@ -136,11 +175,13 @@ const OrganizerPage = () => {
                       <div className="text-xs font-normal text-primary-foreground/60">{c.name}</div>
                     </th>
                   ))}
-                  <th className="px-4 py-3 text-center font-bold whitespace-nowrap text-gold">Total</th>
+                  <th className="px-4 py-3 text-center font-bold whitespace-nowrap text-black dark:text-white">Total</th>
+                  <th className="px-4 py-3 text-left font-semibold whitespace-nowrap">Submitted</th>
+                  <th className="px-4 py-3 text-center font-semibold whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {scores.map((s, idx) => {
+                {activeScores.map((s, idx) => {
                   const hall = halls.find((h) => h.id === s.hallId)?.name ?? '';
                   const org = organizations.find((o) => o.id === s.organizationId)?.name ?? '';
                   const team = teams.find((t) => t.id === s.teamId);
@@ -158,12 +199,26 @@ const OrganizerPage = () => {
                           {s.scores[c.id] ?? 0}
                         </td>
                       ))}
-                      <td className="px-4 py-3 text-center font-bold text-gold text-lg">{s.totalScore}</td>
+                      <td className="px-4 py-3 text-center font-bold text-black dark:text-white text-lg">{s.totalScore}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
+                        {new Date(s.timestamp).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleDeleteScore(s.id, s.reviewerName, team?.name || 'Unknown Team')}
+                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium shadow-sm hover:shadow-md"
+                          title="Delete this score (allows reviewer to re-review)"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </main>

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, ChevronRight, Save, Trophy, Users } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ChevronRight, Save, Trophy, Users, Lock, AlertCircle } from 'lucide-react';
 import { useData } from '@/context/ScoresContext';
 import { toast } from 'sonner';
 
@@ -8,7 +8,7 @@ type Step = 'setup' | 'select-org' | 'select-team' | 'verify-members' | 'scoring
 
 const ReviewerPage = () => {
   const navigate = useNavigate();
-  const { organizations, teams, halls, criteria, getTeamsByOrg, getMembersByTeam, addScore, loading, error } = useData();
+  const { organizations, teams, halls, criteria, getTeamsByOrg, getMembersByTeam, addScore, scores: allScores, loading, error } = useData();
 
   const [step, setStep] = useState<Step>('select-org');
   const [reviewerName, setReviewerName] = useState(() => localStorage.getItem('reviewerName') || '');
@@ -17,10 +17,25 @@ const ReviewerPage = () => {
   const [selectedTeam, setSelectedTeam] = useState('');
   const [membersVerified, setMembersVerified] = useState(false);
   const [scores, setScoresLocal] = useState<Record<string, number>>({});
+  const [existingScore, setExistingScore] = useState<{ id: string; totalScore: number; timestamp: string } | null>(null);
 
   const team = teams.find((t) => t.id === selectedTeam);
   const orgTeams = selectedOrg ? getTeamsByOrg(selectedOrg) : [];
   const teamMembers = selectedTeam ? getMembersByTeam(selectedTeam) : [];
+
+  // Check for existing non-deleted score when team is selected
+  useEffect(() => {
+    if (selectedTeam && reviewerName) {
+      const existing = allScores.find(
+        s => s.reviewerName === reviewerName.trim() && 
+             s.teamId === selectedTeam && 
+             !s.deleted
+      );
+      setExistingScore(existing ? { id: existing.id, totalScore: existing.totalScore, timestamp: existing.timestamp } : null);
+    } else {
+      setExistingScore(null);
+    }
+  }, [selectedTeam, reviewerName, allScores]);
 
   const handleOrgSelect = (orgId: string) => {
     setSelectedOrg(orgId);
@@ -81,7 +96,8 @@ const ReviewerPage = () => {
       setScoresLocal({});
       setStep('select-org');
     } catch (err) {
-      toast.error('Failed to save scores');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save scores';
+      toast.error(errorMessage);
     }
   };
 
@@ -178,6 +194,20 @@ const ReviewerPage = () => {
             </button>
             <h2 className="text-2xl font-bold text-foreground">{team.name}</h2>
 
+            {existingScore && (
+              <div className="rounded-xl border-2 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 p-4 flex items-start gap-3">
+                <Lock className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-300 mb-1">
+                    Score Already Submitted
+                  </p>
+                  <p className="text-xs text-yellow-700 dark:text-yellow-200">
+                    You have already submitted a score for this team. You cannot re-review until the organizer deletes the existing score.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="rounded-xl border border-border bg-card p-5 space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-card-foreground">
                 <Users className="w-4 h-4 text-gold" />
@@ -193,9 +223,21 @@ const ReviewerPage = () => {
 
             <button
               onClick={handleVerify}
-              className="w-full gradient-gold text-gold-foreground font-bold rounded-xl py-3 shadow-gold hover:opacity-90 transition-opacity"
+              disabled={!!existingScore}
+              className={`w-full font-bold rounded-xl py-3 transition-opacity flex items-center justify-center gap-2 ${
+                existingScore
+                  ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                  : 'gradient-gold text-gold-foreground shadow-gold hover:opacity-90'
+              }`}
             >
-              Members Verified — Proceed to Scoring
+              {existingScore ? (
+                <>
+                  <Lock className="w-5 h-5" />
+                  Score Already Submitted
+                </>
+              ) : (
+                'Members Verified — Proceed to Scoring'
+              )}
             </button>
           </div>
         )}
@@ -210,42 +252,67 @@ const ReviewerPage = () => {
               <h2 className="text-2xl font-bold text-foreground">{team.name}</h2>
             </div>
 
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <div className="gradient-navy px-5 py-3 flex items-center justify-between">
-                <span className="text-sm font-semibold text-primary-foreground">Criteria</span>
-                <span className="text-sm font-semibold text-primary-foreground">Score</span>
-              </div>
-              {criteria.map((c) => (
-                <div key={c.id} className="flex items-center justify-between px-5 py-3 border-b border-border last:border-0">
-                  <div>
-                    <span className="font-mono text-xs text-gold font-semibold mr-2">{c.label}</span>
-                    <span className="text-sm text-card-foreground">{c.name}</span>
-                    <span className="text-xs text-muted-foreground ml-2">(max {c.maxMarks})</span>
-                  </div>
-                  <input
-                    type="number"
-                    min={0}
-                    max={c.maxMarks}
-                    value={scores[c.id] ?? ''}
-                    onChange={(e) => handleScoreChange(c.id, e.target.value, c.maxMarks)}
-                    className="w-16 rounded-lg border border-input bg-background px-3 py-1.5 text-center text-sm font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="—"
-                  />
+            {existingScore ? (
+              <div className="rounded-xl border-2 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                  <Lock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                  <h3 className="text-lg font-bold text-yellow-800 dark:text-yellow-300">Score Already Submitted</h3>
                 </div>
-              ))}
-              <div className="flex items-center justify-between px-5 py-3 bg-muted">
-                <span className="font-bold text-foreground">Total</span>
-                <span className="font-bold text-lg text-gold">{totalScore} / 100</span>
+                <div className="space-y-2 text-sm text-yellow-700 dark:text-yellow-200">
+                  <p>You have already submitted a score for this team.</p>
+                  <div className="bg-white dark:bg-yellow-900/40 rounded-lg p-3 space-y-1">
+                    <p><span className="font-semibold">Total Score:</span> {existingScore.totalScore} / 100</p>
+                    <p><span className="font-semibold">Submitted:</span> {new Date(existingScore.timestamp).toLocaleString()}</p>
+                  </div>
+                  <div className="flex items-start gap-2 pt-2 border-t border-yellow-300 dark:border-yellow-700">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs">
+                      You cannot change, re-review, or edit this score until it has been deleted by the organizer. 
+                      Please contact the organizer if you need to make changes.
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="rounded-xl border border-border bg-card overflow-hidden">
+                  <div className="gradient-navy px-5 py-3 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-primary-foreground">Criteria</span>
+                    <span className="text-sm font-semibold text-primary-foreground">Score</span>
+                  </div>
+                  {criteria.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between px-5 py-3 border-b border-border last:border-0">
+                      <div>
+                        <span className="font-mono text-xs text-gold font-semibold mr-2">{c.label}</span>
+                        <span className="text-sm text-card-foreground">{c.name}</span>
+                        <span className="text-xs text-muted-foreground ml-2">(max {c.maxMarks})</span>
+                      </div>
+                      <input
+                        type="number"
+                        min={0}
+                        max={c.maxMarks}
+                        value={scores[c.id] ?? ''}
+                        onChange={(e) => handleScoreChange(c.id, e.target.value, c.maxMarks)}
+                        className="w-16 rounded-lg border border-input bg-background px-3 py-1.5 text-center text-sm font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        placeholder="—"
+                      />
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between px-5 py-3 bg-muted">
+                    <span className="font-bold text-foreground">Total</span>
+                    <span className="font-bold text-lg text-gold">{totalScore} / 100</span>
+                  </div>
+                </div>
 
-            <button
-              onClick={handleSave}
-              className="w-full gradient-gold text-gold-foreground font-bold rounded-xl py-3 shadow-gold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-            >
-              <Save className="w-5 h-5" />
-              Save Scores
-            </button>
+                <button
+                  onClick={handleSave}
+                  className="w-full gradient-gold text-gold-foreground font-bold rounded-xl py-3 shadow-gold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                >
+                  <Save className="w-5 h-5" />
+                  Save Scores
+                </button>
+              </>
+            )}
           </div>
         )}
       </main>

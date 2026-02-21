@@ -1,11 +1,25 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Download, Trophy } from 'lucide-react';
-import { organizations, teams, halls, criteria } from '@/data/mockData';
-import { useScores } from '@/context/ScoresContext';
+import { ArrowLeft, Download, Trophy, Shield, Trash2, Edit } from 'lucide-react';
+import { useData } from '@/context/ScoresContext';
+import { useState } from 'react';
 
 const OrganizerPage = () => {
   const navigate = useNavigate();
-  const { scores } = useScores();
+  const { organizations, teams, halls, criteria, scores, loading, error, clearAllData } = useData();
+  const [isAdminMode, setIsAdminMode] = useState(() => {
+    return localStorage.getItem('organizerAdminToken') === 'organizer-admin-token';
+  });
+
+  const toggleAdminMode = () => {
+    setIsAdminMode(!isAdminMode);
+  };
+
+  const clearDatabase = async () => {
+    if (confirm('Are you sure you want to clear all local data? This action cannot be undone.')) {
+      clearAllData();
+      alert('Local data cleared successfully');
+    }
+  };
 
   const exportCSV = () => {
     const headers = [
@@ -13,7 +27,6 @@ const OrganizerPage = () => {
       'Reviewer',
       'Organization',
       'Team',
-      'Project Title',
       ...criteria.map((c) => `${c.label} (${c.name})`),
       'Total',
       'Timestamp',
@@ -28,7 +41,6 @@ const OrganizerPage = () => {
         s.reviewerName,
         org,
         team?.name ?? '',
-        team?.projectTitle ?? '',
         ...criteria.map((c) => s.scores[c.id]?.toString() ?? '0'),
         s.totalScore.toString(),
         new Date(s.timestamp).toLocaleString(),
@@ -45,6 +57,30 @@ const OrganizerPage = () => {
     URL.revokeObjectURL(url);
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold mx-auto"></div>
+          <p className="mt-2 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500">Error: {error}</p>
+          <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-gold text-gold-foreground rounded">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="gradient-navy px-6 py-4 flex items-center gap-4">
@@ -57,10 +93,25 @@ const OrganizerPage = () => {
         </div>
         <button
           onClick={exportCSV}
-          className="ml-auto gradient-gold text-gold-foreground font-semibold rounded-lg px-4 py-2 text-sm flex items-center gap-2 shadow-gold hover:opacity-90 transition-opacity"
+          className="gradient-gold text-gold-foreground font-semibold rounded-lg px-4 py-2 text-sm flex items-center gap-2 shadow-gold hover:opacity-90 transition-opacity"
         >
           <Download className="w-4 h-4" />
           Export CSV
+        </button>
+        <button
+          onClick={toggleAdminMode}
+          disabled={localStorage.getItem('organizerAdminToken') === 'organizer-admin-token'}
+          className={`font-semibold rounded-lg px-4 py-2 text-sm flex items-center gap-2 transition-colors ${
+            isAdminMode
+              ? 'bg-red-500 text-white hover:bg-red-600 disabled:bg-green-600'
+              : 'bg-green-500 text-white hover:bg-green-600'
+          } ${localStorage.getItem('organizerAdminToken') === 'organizer-admin-token' ? 'cursor-not-allowed' : ''}`}
+        >
+          <Shield className="w-4 h-4" />
+          {isAdminMode ? 'Exit Admin' : 'Admin Mode'}
+          {localStorage.getItem('organizerAdminToken') === 'organizer-admin-token' && (
+            <span className="text-xs">(Auto-enabled)</span>
+          )}
         </button>
       </header>
 
@@ -79,7 +130,6 @@ const OrganizerPage = () => {
                   <th className="px-4 py-3 text-left font-semibold whitespace-nowrap">Reviewer</th>
                   <th className="px-4 py-3 text-left font-semibold whitespace-nowrap">Organization</th>
                   <th className="px-4 py-3 text-left font-semibold whitespace-nowrap">Team</th>
-                  <th className="px-4 py-3 text-left font-semibold whitespace-nowrap">Project</th>
                   {criteria.map((c) => (
                     <th key={c.id} className="px-3 py-3 text-center font-semibold whitespace-nowrap">
                       <div className="text-gold">{c.label}</div>
@@ -103,9 +153,6 @@ const OrganizerPage = () => {
                       <td className="px-4 py-3 whitespace-nowrap text-foreground">{s.reviewerName}</td>
                       <td className="px-4 py-3 whitespace-nowrap text-foreground">{org}</td>
                       <td className="px-4 py-3 whitespace-nowrap font-medium text-foreground">{team?.name}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground max-w-[200px] truncate">
-                        {team?.projectTitle}
-                      </td>
                       {criteria.map((c) => (
                         <td key={c.id} className="px-3 py-3 text-center text-foreground">
                           {s.scores[c.id] ?? 0}
@@ -120,6 +167,41 @@ const OrganizerPage = () => {
           </div>
         )}
       </main>
+
+      {isAdminMode && (
+        <div className="border-t border-border bg-muted/30 p-6">
+          <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-red-500" />
+            Admin Panel
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="bg-card border border-border rounded-lg p-4">
+              <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+                <Edit className="w-4 h-4" />
+                Database Operations
+              </h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Clear all local scores and reset to initial team data.
+              </p>
+              <button
+                onClick={clearDatabase}
+                className="w-full bg-red-600 text-white px-3 py-2 rounded text-sm flex items-center gap-2 hover:bg-red-700"
+              >
+                <Trash2 className="w-4 h-4" />
+                Clear All Data
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <h4 className="font-semibold text-yellow-800 mb-2">ℹ️ Frontend-Only Mode</h4>
+            <p className="text-sm text-yellow-700">
+              This application runs in the browser with local data storage. Data persists across refresh and is only removed when you click "Clear All Data" above.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,53 +1,47 @@
-# Welcome to your Lovable project
+# NIQR Kaizen Competition Scoring Platform
 
-## Project info
+A modern, responsive React application for managing and scoring Kaizen competition entries. This is a **frontend-only** application that runs entirely in the browser.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- **Reviewer Dashboard**: Score teams across multiple criteria
+- **Organizer Dashboard**: View all scores and export to CSV
+- **Admin Panel**: Local data management (frontend-only)
+- **Responsive Design**: Works on desktop and mobile devices
+- **PWA Support**: Can be installed as a progressive web app
+- **Local Data Storage**: All data stored in browser local storage
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Quick Start
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Install dependencies
+npm install
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The application will be available at `http://localhost:8080`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## User Roles & Credentials
 
-**Use GitHub Codespaces**
+### Organizer
+- **Username**: `Organiser-01`
+- **Password**: `India@2026`
+- **Access**: Full dashboard with admin panel
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
+### Reviewer
+- **Username**: `reviewer1` or `reviewer2`
+- **Password**: `pass1` or `pass2`
+- **Access**: Scoring interface for assigned hall
+
+## Data Management
+
+Since this is a frontend-only application:
+- All data is stored locally in the browser
+- Data persists during the session but is cleared on refresh
+- Use the "Clear All Data" function in admin panel to reset
+- Export scores to CSV for permanent storage
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
 ## What technologies are used for this project?
@@ -59,6 +53,16 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+
+## Security Considerations
+
+This is a frontend-only application with mock data. All data is stored locally in the browser.
+
+### Features
+- Client-side data storage
+- No backend API calls
+- Mock data for demonstration
+- Responsive design with Tailwind CSS
 
 ## How can I deploy this project?
 

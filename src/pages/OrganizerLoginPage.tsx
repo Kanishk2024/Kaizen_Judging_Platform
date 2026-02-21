@@ -14,7 +14,10 @@ const OrganizerLoginPage = () => {
   const handleLogin = (e: FormEvent) => {
     e.preventDefault();
     // Validate credentials
-    if (username === 'Organiser-01' && password === 'India@2026') {      localStorage.setItem('organizerUsername', username);      navigate('/organizer');
+    if (username === 'Organiser-01' && password === 'India@2026') {
+      localStorage.setItem('organizerUsername', username);
+      localStorage.setItem('organizerAdminToken', 'organizer-admin-token'); // Grant admin access
+      navigate('/organizer');
     } else {
       alert('Invalid credentials');
     }

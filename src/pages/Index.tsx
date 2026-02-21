@@ -18,7 +18,7 @@ const Index = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-lg">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-2xl">
         <button
           onClick={() => navigate('/reviewer/login')}
           className="group relative flex flex-col items-center gap-4 rounded-2xl p-8 bg-card shadow-card border border-border hover:shadow-gold hover:border-gold transition-all duration-300"
@@ -41,7 +41,7 @@ const Index = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-card-foreground">Organizer</h2>
-            <p className="text-sm text-muted-foreground mt-1">View all scores & export</p>
+            <p className="text-sm text-muted-foreground mt-1">View scores, export & clear data</p>
           </div>
         </button>
       </div>

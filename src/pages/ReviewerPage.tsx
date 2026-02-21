@@ -1,16 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, ChevronRight, Save, Trophy, Users } from 'lucide-react';
-import { organizations, halls, criteria, getTeamsByOrg, teams, reviewers } from '@/data/mockData';
-import type { ScoreEntry } from '@/data/mockData';
-import { useScores } from '@/context/ScoresContext';
+import { useData } from '@/context/ScoresContext';
 import { toast } from 'sonner';
 
 type Step = 'setup' | 'select-org' | 'select-team' | 'verify-members' | 'scoring';
 
 const ReviewerPage = () => {
   const navigate = useNavigate();
-  const { addScore } = useScores();
+  const { organizations, teams, halls, criteria, getTeamsByOrg, getMembersByTeam, addScore, loading, error } = useData();
 
   const [step, setStep] = useState<Step>('select-org');
   const [reviewerName, setReviewerName] = useState(() => localStorage.getItem('reviewerName') || '');
@@ -22,6 +20,7 @@ const ReviewerPage = () => {
 
   const team = teams.find((t) => t.id === selectedTeam);
   const orgTeams = selectedOrg ? getTeamsByOrg(selectedOrg) : [];
+  const teamMembers = selectedTeam ? getMembersByTeam(selectedTeam) : [];
 
   const handleOrgSelect = (orgId: string) => {
     setSelectedOrg(orgId);
@@ -55,13 +54,13 @@ const ReviewerPage = () => {
 
   const totalScore = Object.values(scores).reduce((a, b) => a + b, 0);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const allFilled = criteria.every((c) => scores[c.id] !== undefined);
     if (!allFilled) {
       toast.error('Please enter marks for all criteria');
       return;
     }
-    const entry: ScoreEntry = {
+    const entry = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       hallId: selectedHall,
       reviewerName: reviewerName.trim(),
@@ -72,15 +71,43 @@ const ReviewerPage = () => {
       totalScore,
       timestamp: new Date().toISOString(),
     };
-    addScore(entry);
-    toast.success('Scores saved successfully!');
-    // Reset for next team
-    setSelectedOrg('');
-    setSelectedTeam('');
-    setMembersVerified(false);
-    setScoresLocal({});
-    setStep('select-org');
+    try {
+      await addScore(entry);
+      toast.success('Scores saved successfully!');
+      // Reset for next team
+      setSelectedOrg('');
+      setSelectedTeam('');
+      setMembersVerified(false);
+      setScoresLocal({});
+      setStep('select-org');
+    } catch (err) {
+      toast.error('Failed to save scores');
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold mx-auto"></div>
+          <p className="mt-2 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500">Error: {error}</p>
+          <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-gold text-gold-foreground rounded">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -137,7 +164,6 @@ const ReviewerPage = () => {
                   className="group rounded-xl border border-border bg-card p-4 text-left hover:border-gold hover:shadow-gold transition-all"
                 >
                   <div className="font-semibold text-card-foreground text-sm">{t.name}</div>
-                  <div className="text-xs text-muted-foreground mt-1 truncate">{t.projectTitle}</div>
                 </button>
               ))}
             </div>
@@ -151,14 +177,13 @@ const ReviewerPage = () => {
               <ArrowLeft className="w-4 h-4" /> Back to teams
             </button>
             <h2 className="text-2xl font-bold text-foreground">{team.name}</h2>
-            <p className="text-muted-foreground">{team.projectTitle}</p>
 
             <div className="rounded-xl border border-border bg-card p-5 space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-card-foreground">
                 <Users className="w-4 h-4 text-gold" />
                 Team Members
               </div>
-              {team.members.map((m) => (
+              {teamMembers.map((m) => (
                 <div key={m.id} className="flex items-center gap-3 rounded-lg bg-muted px-4 py-2.5">
                   <CheckCircle2 className="w-4 h-4 text-success" />
                   <span className="text-sm text-foreground">{m.name}</span>
@@ -183,7 +208,6 @@ const ReviewerPage = () => {
             </button>
             <div>
               <h2 className="text-2xl font-bold text-foreground">{team.name}</h2>
-              <p className="text-sm text-muted-foreground">{team.projectTitle}</p>
             </div>
 
             <div className="rounded-xl border border-border bg-card overflow-hidden">

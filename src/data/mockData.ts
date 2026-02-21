@@ -48,12 +48,12 @@ export const organizations = [
 ];
 
 // Reviewers
-export const reviewers = Array.from({ length: 20 }, (_, i) => ({
+export const reviewers = Array.from({ length: 10 }, (_, i) => ({
   id: `reviewer-${i + 1}`,
   username: `Jury-${String(i + 1).padStart(2, '0')}`,
   password: 'India@2026',
   name: `Judge ${i + 1}`,
-  hallId: `hall-${Math.floor(i / 4) + 1}`, // 4 reviewers per hall
+  hallId: `hall-${Math.floor(i / 2) + 1}`, // 2 reviewers per hall
 }));
 
 // Teams
@@ -173,7 +173,7 @@ export const teams = [
 // Halls
 export const halls = Array.from({ length: 5 }, (_, i) => ({
   id: `hall-${i + 1}`,
-  name: `Hall ${i + 1}`,
+  name: `Hall ${i + 301}`,
 }));
 
 // Criteria (KAIZEN Competition)
